@@ -1,3 +1,8 @@
 
 //Simple example
-require("../texwrapper.js")("Ax = b").pipe(process.stdout);
+var dvistream = require("../texwrapper.js")([
+  "\\documentclass{article}",
+  "\\begin{document}",
+  "abc",
+  "\\end{document}"
+]);

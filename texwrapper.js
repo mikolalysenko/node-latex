@@ -47,24 +47,38 @@ function awaitDir(cb) {
 //Send errors downstream to result
 function handleErrors(dirpath, result) {
   var log_file = path.join(dirpath, "texput.log");
+  console.log("reading log files:", log_file);
   fs.exists(log_file, function(exists) {
-  
     if(!exists) {
       fs.rmdir(dirpath);
       result.emit("error", new Error("Error running LaTeX"));
       return;
     }
-    
     //Try to crawl through the horrible mess that LaTeX shat upon us
     var log = fs.createReadStream(log_file);
-    
-    
-  
+    console.log("reading log file:", log_file);
+    var err = [];
+    log.on("data", function(data) {
+      console.log("BUF = ", data.toString());
+      var lines = data.toString().split();
+      for(var i=0; i<lines.length; ++i) {
+        if(lines[i].charAt(0) === "!") {
+          err.push(lines[i]);
+        }
+      }
+    });
+    log.on("end", function() {
+      if(err.length > 0) {
+        result.emit("error", new Error(err.join("\n")));
+      } else {
+        result.emit("error", new Error("Unspecified LaTeX error"));
+      }
+    });
   });
 }
 
 //Converts a expression into a LaTeX image
-module.exports = function(expr, options) {
+module.exports = function(doc, options) {
   if(!options) {
     options = {};
   }
@@ -74,6 +88,8 @@ module.exports = function(expr, options) {
   
   //Create result
   var result = new Stream();
+  result.writable = true;
+  result.readable = true;
   awaitDir(function(err, dirpath) {
     function error(e) {
       result.emit("error", e);
@@ -83,16 +99,24 @@ module.exports = function(expr, options) {
       error(err);
       return;
     }
-    
     //Write data to tex file
-    console.log("directory = ", dirpath);
     var input_path = path.join(dirpath, "texput.tex");
     var tex_file = fs.createWriteStream(input_path);
-    tex_file.write(header);
-    tex_file.write(expr);
-    tex_file.end(footer);
-    tex_file.destroySoon();
-    
+    if(typeof(doc) === "string") {
+      tex_file.end(doc);
+    } else if(doc instanceof Buffer) {
+      tex_file.end(doc);
+    } else if(doc instanceof Array) {
+      for(var i=0; i<doc.length; ++i) {
+        tex_file.write(doc[i]);
+      }
+      tex_file.end();
+    } else if(doc.pipe) {
+      doc.pipe(tex_file);
+    } else {
+      error(new Error("Invalid expression format"));
+      return;
+    }
     //Invoke LaTeX
     var tex = spawn(tex_command, [
       "-interaction=batchmode",
@@ -101,10 +125,6 @@ module.exports = function(expr, options) {
       cwd: dirpath,
       env: process.env
     });
-    
-    //tex.stdout.pipe(process.stdout);
-    console.log("Calling latex");
-    
     //Wait for LaTeX to finish its thing
     tex.on("exit", function(code, signal) {
       var output_file = path.join(dirpath, "texput.dvi");
