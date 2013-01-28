@@ -1,8 +1,9 @@
 var spawn   = require("child_process").spawn;
-var temp    = require("temp");
-var fs      = require("fs");
 var path    = require("path");
-var Stream  = require("stream");
+var fs      = require("fs");
+var fse     = require("fs-extra");
+var temp    = require("temp");
+var through = require("through");
 
 //Eagerly create temporary directory
 var directory_built = false
@@ -11,6 +12,11 @@ var directory_built = false
   , directory_path  = "/tmp"
   , directory_count = 0;
 temp.mkdir("node-latex", function(err, dirpath) {
+  if(!err) {
+    process.on("exit", function() {
+      fse.removeSync(dirpath);
+    });
+  }
   directory_err = err;
   directory_path = dirpath;
   directory_built = true;
@@ -24,12 +30,11 @@ temp.mkdir("node-latex", function(err, dirpath) {
 function awaitDir(cb) {
   function makeLocalDir() {
     if(directory_err) {
-      console.log("Error creating temp directory", directory_err);
       cb(directory_err, null);
       return;
     }
     var temp_path = path.join(directory_path, "" + directory_count++);
-    fs.mkdir(temp_path, function(err) {
+    fse.mkdirp(temp_path, function(err) {
       if(err) {
         cb(err, null);
         return;
@@ -47,28 +52,27 @@ function awaitDir(cb) {
 //Send errors downstream to result
 function handleErrors(dirpath, result) {
   var log_file = path.join(dirpath, "texput.log");
-  console.log("reading log files:", log_file);
   fs.exists(log_file, function(exists) {
     if(!exists) {
-      fs.rmdir(dirpath);
+      fse.remove(dirpath);
       result.emit("error", new Error("Error running LaTeX"));
       return;
     }
     //Try to crawl through the horrible mess that LaTeX shat upon us
     var log = fs.createReadStream(log_file);
-    console.log("reading log file:", log_file);
     var err = [];
     log.on("data", function(data) {
-      console.log("BUF = ", data.toString());
-      var lines = data.toString().split();
+      var lines = data.toString().split("\n");
       for(var i=0; i<lines.length; ++i) {
-        if(lines[i].charAt(0) === "!") {
+        var l = lines[i];
+        if(l.length > 0 && l.charAt(0) === "!") {
           err.push(lines[i]);
         }
       }
     });
     log.on("end", function() {
       if(err.length > 0) {
+        err.unshift("LaTeX Syntax Error");
         result.emit("error", new Error(err.join("\n")));
       } else {
         result.emit("error", new Error("Unspecified LaTeX error"));
@@ -87,9 +91,7 @@ module.exports = function(doc, options) {
   var tex_command = options.command || "latex";
   
   //Create result
-  var result = new Stream();
-  result.writable = true;
-  result.readable = true;
+  var result = through();
   awaitDir(function(err, dirpath) {
     function error(e) {
       result.emit("error", e);
@@ -102,9 +104,34 @@ module.exports = function(doc, options) {
     //Write data to tex file
     var input_path = path.join(dirpath, "texput.tex");
     var tex_file = fs.createWriteStream(input_path);
-    if(typeof(doc) === "string") {
-      tex_file.end(doc);
-    } else if(doc instanceof Buffer) {
+    
+    tex_file.on("close", function() {
+      //Invoke LaTeX
+      var tex = spawn(tex_command, [
+        "-interaction=nonstopmode",
+        "texput.tex"
+      ], {
+        cwd: dirpath,
+        env: process.env
+      });
+      //Wait for LaTeX to finish its thing
+      tex.on("exit", function(code, signal) {
+        var output_file = path.join(dirpath, "texput.dvi");
+        fs.exists(output_file, function(exists) {
+          if(exists) {
+            var stream = fs.createReadStream(output_file);
+            stream.on("close", function() {
+              fse.remove(dirpath);
+            });
+            stream.pipe(result);
+          } else {
+            handleErrors(dirpath, result);
+          }
+        });
+      });
+    });
+    
+    if(typeof doc === "string" || doc instanceof Buffer) {
       tex_file.end(doc);
     } else if(doc instanceof Array) {
       for(var i=0; i<doc.length; ++i) {
@@ -114,32 +141,9 @@ module.exports = function(doc, options) {
     } else if(doc.pipe) {
       doc.pipe(tex_file);
     } else {
-      error(new Error("Invalid expression format"));
+      error(new Error("Invalid document"));
       return;
     }
-    //Invoke LaTeX
-    var tex = spawn(tex_command, [
-      "-interaction=batchmode",
-      "texput.tex"
-    ], {
-      cwd: dirpath,
-      env: process.env
-    });
-    //Wait for LaTeX to finish its thing
-    tex.on("exit", function(code, signal) {
-      var output_file = path.join(dirpath, "texput.dvi");
-      fs.exists(output_file, function(exists) {
-        if(exists) {
-          var stream = fs.createReadStream(output_file);
-          stream.on("close", function() {
-            fs.rmdir(dirpath);
-          });
-          stream.pipe(result);
-        } else {
-          handleErrors(dirpath, result);
-        }
-      });
-    });
   });
   
   return result;

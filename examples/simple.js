@@ -6,3 +6,4 @@ var dvistream = require("../texwrapper.js")([
   "abc",
   "\\end{document}"
 ]);
+dvistream.pipe(process.stdout);

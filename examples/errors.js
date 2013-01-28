@@ -1,0 +1,1 @@
+require("../texwrapper.js")("asdhfaksdhf").pipe(process.stdout);
