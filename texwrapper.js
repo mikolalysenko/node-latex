@@ -87,8 +87,10 @@ module.exports = function(doc, options) {
     options = {};
   }
   
+  var format = options.format || "pdf";
+  
   //LaTeX command
-  var tex_command = options.command || "latex";
+  var tex_command = options.command || (format === "pdf" ? "pdflatex" : "latex");
   
   //Create result
   var result = through();
@@ -116,7 +118,7 @@ module.exports = function(doc, options) {
       });
       //Wait for LaTeX to finish its thing
       tex.on("exit", function(code, signal) {
-        var output_file = path.join(dirpath, "texput.dvi");
+        var output_file = path.join(dirpath, "texput." + format);
         fs.exists(output_file, function(exists) {
           if(exists) {
             var stream = fs.createReadStream(output_file);

@@ -1,6 +1,6 @@
 {
   "name": "latex",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A simple wrapper for LaTeX in node.js",
   "main": "texwrapper.js",
   "directories": {
@@ -27,7 +27,9 @@
     "equations",
     "typesetting",
     "math",
-    "pdflatex"
+    "pdflatex",
+    "dvi",
+    "pdf"
   ],
   "author": "Mikola Lysenko",
   "license": "MIT",
