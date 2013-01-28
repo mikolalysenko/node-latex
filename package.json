@@ -1,0 +1,36 @@
+{
+  "name": "latex",
+  "version": "0.0.0",
+  "description": "A simple wrapper for LaTeX in node.js",
+  "main": "texwrapper.js",
+  "directories": {
+    "example": "examples"
+  },
+  "dependencies": {
+    "temp": "~0.5.0",
+    "through": "~2.1.0",
+    "fs-extra": "~0.3.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "node examples/simple.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mikolalysenko/node-latex.git"
+  },
+  "keywords": [
+    "latex",
+    "dvi",
+    "tex",
+    "mathmode",
+    "equations",
+    "typesetting",
+    "math",
+    "pdflatex"
+  ],
+  "author": "Mikola Lysenko",
+  "license": "MIT",
+  "readmeFilename": "README.md",
+  "gitHead": "926750a26105a84f98ef1c40498218b831a3409d"
+}
