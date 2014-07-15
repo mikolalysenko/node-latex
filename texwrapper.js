@@ -116,6 +116,16 @@ module.exports = function(doc, options) {
         cwd: dirpath,
         env: process.env
       });
+
+      // Let the user know if LaTeX couldn't be found
+      tex.on('error', function(err) {
+        if (err.code === 'ENOENT') { 
+          console.error("\nThere was an error spawning " + tex_command + ". \n"
+                        + "Please make sure your LaTeX distribution is"
+                        + "properly installed.\n");
+        }
+      });
+
       //Wait for LaTeX to finish its thing
       tex.on("exit", function(code, signal) {
         var output_file = path.join(dirpath, "texput." + format);
