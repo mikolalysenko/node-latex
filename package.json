@@ -9,7 +9,7 @@
   "dependencies": {
     "temp": "~0.5.0",
     "through": "~2.1.0",
-    "fs-extra": "~0.3.2"
+    "fs-extra": "~0.24.0"
   },
   "devDependencies": {},
   "scripts": {
