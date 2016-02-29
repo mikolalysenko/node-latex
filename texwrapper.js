@@ -112,16 +112,18 @@ module.exports = function(doc, options) {
       "texput.tex"
     ]);
 
+    // If env is specified in options, use it, otherwise use process.env.  
+    var env = options.env || process.env;
+
     //Write data to tex file
     var input_path = path.join(dirpath, "texput.tex");
     var tex_file = fs.createWriteStream(input_path);
-
 
     tex_file.on("close", function() {
       //Invoke LaTeX
       var tex = spawn(tex_command, allArgs, {
         cwd: dirpath,
-        env: process.env
+        env: env
       });
 
       // Let the user know if LaTeX couldn't be found
