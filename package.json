@@ -7,7 +7,7 @@
     "example": "examples"
   },
   "dependencies": {
-    "temp": "~0.5.0",
+    "temp": "~0.6.0",
     "through": "~2.1.0",
     "fs-extra": "~0.3.2"
   },
