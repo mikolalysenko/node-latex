@@ -1,18 +1,18 @@
-var spawn   = require("child_process").spawn;
-var path    = require("path");
-var fs      = require("fs");
-var fse     = require("fs-extra");
-var temp    = require("temp");
+var spawn = require("child_process").spawn;
+var path = require("path");
+var fs = require("fs");
+var fse = require("fs-extra");
+var temp = require("temp");
 var through = require("through");
 
 //Eagerly create temporary directory
-var directory_built = false
-  , directory_err   = null
-  , directory_wait  = []
-  , directory_path  = "/tmp"
-  , directory_count = 0;
+var directory_built = false;
+var directory_err = null;
+var directory_wait = [];
+var directory_path = "/tmp";
+var directory_count = 0;
 temp.mkdir("node-latex", function(err, dirpath) {
-  if(!err) {
+  if (!err) {
     process.on("exit", function() {
       fse.removeSync(dirpath);
     });
@@ -20,7 +20,7 @@ temp.mkdir("node-latex", function(err, dirpath) {
   directory_err = err;
   directory_path = dirpath;
   directory_built = true;
-  for(var i=0; i<directory_wait.length; ++i) {
+  for (var i = 0; i < directory_wait.length; ++i) {
     directory_wait[i]();
   }
   directory_wait.length = 0;
@@ -29,20 +29,20 @@ temp.mkdir("node-latex", function(err, dirpath) {
 //Waits for directory to be built
 function awaitDir(cb) {
   function makeLocalDir() {
-    if(directory_err) {
+    if (directory_err) {
       cb(directory_err, null);
       return;
     }
     var temp_path = path.join(directory_path, "" + directory_count++);
     fse.mkdirp(temp_path, function(err) {
-      if(err) {
+      if (err) {
         cb(err, null);
         return;
       }
       cb(null, temp_path);
     });
   }
-  if(directory_built) {
+  if (directory_built) {
     makeLocalDir();
   } else {
     directory_wait.push(makeLocalDir);
@@ -53,7 +53,7 @@ function awaitDir(cb) {
 function handleErrors(dirpath, result) {
   var log_file = path.join(dirpath, "texput.log");
   fs.exists(log_file, function(exists) {
-    if(!exists) {
+    if (!exists) {
       fse.remove(dirpath);
       result.emit("error", new Error("Error running LaTeX"));
       return;
@@ -63,15 +63,15 @@ function handleErrors(dirpath, result) {
     var err = [];
     log.on("data", function(data) {
       var lines = data.toString().split("\n");
-      for(var i=0; i<lines.length; ++i) {
+      for (var i = 0; i < lines.length; ++i) {
         var l = lines[i];
-        if(l.length > 0 && l.charAt(0) === "!") {
+        if (l.length > 0 && l.charAt(0) === "!") {
           err.push(lines[i]);
         }
       }
     });
     log.on("end", function() {
-      if(err.length > 0) {
+      if (err.length > 0) {
         err.unshift("LaTeX Syntax Error");
         result.emit("error", new Error(err.join("\n")));
       } else {
@@ -83,15 +83,15 @@ function handleErrors(dirpath, result) {
 
 //Converts a expression into a LaTeX image
 module.exports = function(doc, options) {
-  if(!options) {
+  if (!options) {
     options = {};
   }
-  
+
   var format = options.format || "pdf";
-  
+
   //LaTeX command
   var tex_command = options.command || (format === "pdf" ? "pdflatex" : "latex");
-  
+
   //Create result
   var result = through();
   awaitDir(function(err, dirpath) {
@@ -99,30 +99,39 @@ module.exports = function(doc, options) {
       result.emit("error", e);
       result.destroySoon();
     }
-    if(err) {
+    if (err) {
       error(err);
       return;
     }
+
+    // Create command line args
+    var moreArgs = options.args || [];
+
+    var allArgs = moreArgs.concat([
+      "-interaction=nonstopmode",
+      "texput.tex"
+    ]);
+
+    // If env is specified in options, use it, otherwise use process.env.  
+    var env = options.env || process.env;
+
     //Write data to tex file
     var input_path = path.join(dirpath, "texput.tex");
     var tex_file = fs.createWriteStream(input_path);
-    
+
     tex_file.on("close", function() {
       //Invoke LaTeX
-      var tex = spawn(tex_command, [
-        "-interaction=nonstopmode",
-        "texput.tex"
-      ], {
+      var tex = spawn(tex_command, allArgs, {
         cwd: dirpath,
-        env: process.env
+        env: env
       });
 
       // Let the user know if LaTeX couldn't be found
       tex.on('error', function(err) {
-        if (err.code === 'ENOENT') { 
+        if (err.code === 'ENOENT') {
           console.error("\nThere was an error spawning " + tex_command + ". \n"
-                        + "Please make sure your LaTeX distribution is"
-                        + "properly installed.\n");
+            + "Please make sure your LaTeX distribution is"
+            + "properly installed.\n");
         }
       });
 
@@ -130,7 +139,7 @@ module.exports = function(doc, options) {
       tex.on("exit", function(code, signal) {
         var output_file = path.join(dirpath, "texput." + format);
         fs.exists(output_file, function(exists) {
-          if(exists) {
+          if (exists) {
             var stream = fs.createReadStream(output_file);
             stream.on("close", function() {
               fse.remove(dirpath);
@@ -142,21 +151,21 @@ module.exports = function(doc, options) {
         });
       });
     });
-    
-    if(typeof doc === "string" || doc instanceof Buffer) {
+
+    if (typeof doc === "string" || doc instanceof Buffer) {
       tex_file.end(doc);
-    } else if(doc instanceof Array) {
-      for(var i=0; i<doc.length; ++i) {
+    } else if (doc instanceof Array) {
+      for (var i = 0; i < doc.length; ++i) {
         tex_file.write(doc[i]);
       }
       tex_file.end();
-    } else if(doc.pipe) {
+    } else if (doc.pipe) {
       doc.pipe(tex_file);
     } else {
       error(new Error("Invalid document"));
       return;
     }
   });
-  
+
   return result;
 }
