@@ -114,7 +114,8 @@ module.exports = function(doc, options) {
         "texput.tex"
       ], {
         cwd: dirpath,
-        env: process.env
+        env: process.env,
+        stdio: ['ignore','ignore','ignore']
       });
 
       // Let the user know if LaTeX couldn't be found
