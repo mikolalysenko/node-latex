@@ -137,6 +137,7 @@ module.exports = function(doc, options) {
               fse.remove(dirpath);
             });
             stream.pipe(result);
+            result.emit("ready");
           } else {
             handleErrors(dirpath, result);
           }
