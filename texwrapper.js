@@ -91,18 +91,42 @@ module.exports = function(doc, options) {
   
   //LaTeX command
   var tex_command = options.command || (format === "pdf" ? "pdflatex" : "latex");
+
+  // Includes
+  var tex_includes = options.includes || [];
   
   //Create result
   var result = through();
   awaitDir(function(err, dirpath) {
     function error(e) {
       result.emit("error", e);
-      result.destroySoon();
+      result.end();
     }
     if(err) {
       error(err);
       return;
     }
+
+    //Copy includes to cwd
+    for (var incpath of tex_includes) {
+      var inc_outpath = path.join(dirpath, incpath);
+      fse.ensureDir(inc_outpath, function (err) {
+        if(err) {
+          error(err);
+          return;
+        }
+
+        fse.copy(
+          incpath, inc_outpath, function (err) {
+            if(err) {
+              error(err);
+              return;
+            }
+          }
+        )
+      })
+    }
+
     //Write data to tex file
     var input_path = path.join(dirpath, "texput.tex");
     var tex_file = fs.createWriteStream(input_path);
